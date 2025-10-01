@@ -14,7 +14,7 @@ vector<long double> refer = {
 };
 
 long double analyze(string a) {
-    int len = a.length();
+    int len = a.length();   
     vector<int> hashtable(26);
     for (auto ch : a) {
         hashtable[(int)(ch - 'a')]++;
@@ -83,29 +83,22 @@ int main() {
     int keylen = -1;
 
     long double minvalue = INT_MAX;
-    for (int i = 1; i <= len; i++) {
-        int ptr = 0;
-        vector<string> str(i);
-        for (auto ch : alphasecret) {
-            str[ptr] += ch;
-            ptr = (ptr + 1) % i; 
-        }
-        long double curanalysis = 0;
-        for (string cur : str) {
-            curanalysis += abs(analyze(cur) - expectedvalue);
-        }
-        curanalysis /= i;
-        if (curanalysis < minvalue) {
-            minvalue = curanalysis;
-            keylen = i;
+    vector<vector<string>> tmpstr(len, vector<string>(len));
+    for (int i = 0; i < alphasecret.length(); i++) {
+        for (int j = 0; j < len; j++) {
+            tmpstr[j][i % (j + 1)] += alphasecret[i];
         }
     }
-
-    vector<string> str(keylen);
-    int ptr = 0;
-    for (auto ch : alphasecret) {
-        str[ptr] += ch;
-        ptr = (ptr + 1) % keylen; 
+    for (int i = 0; i < len; i++) {
+        long double curanalysis = 0;
+        for (int j = 0; j <= i; j++) {
+            curanalysis += abs(analyze(tmpstr[i][j]) - expectedvalue);
+        }
+        curanalysis /= (i + 1);
+        if (curanalysis < minvalue) {
+            minvalue = curanalysis;
+            keylen = i + 1;
+        }
     }
 
     string crypto;
@@ -114,7 +107,7 @@ int main() {
         long double curmin = INT_MAX;
 
         for (int j = 0; j < 26; j++) {
-            string temp = str[i];
+            string temp = tmpstr[keylen - 1][i];
             long double curanalysis = newanalyze(shiftstring(temp, j));
             if (curanalysis < curmin) {
                 curmin = curanalysis;
