@@ -6,7 +6,7 @@
 #include <immintrin.h>
 using namespace std;
 
-void gf_add(vector<uint64_t> &ans, const vector<uint64_t> &a, const vector<uint64_t> &b) {
+void gf_add(uint64_t ans[3], const uint64_t a[3], const uint64_t b[3]) {
 
     for (uint32_t i = 0; i < 3; i++) {
         ans[i] = a[i] ^ b[i];
@@ -14,8 +14,7 @@ void gf_add(vector<uint64_t> &ans, const vector<uint64_t> &a, const vector<uint6
 
 }
 
-vector<uint64_t> gf_mod(vector<uint64_t> &a) {
-    vector<uint64_t> ans(3);
+void gf_mod(uint64_t ans[3], uint64_t a[5]) {
     uint64_t t;
     for (uint8_t i = 4; i >= 3; i--) {
         t = a[i];
@@ -30,14 +29,13 @@ vector<uint64_t> gf_mod(vector<uint64_t> &a) {
     ans[1] = a[1] ^ (t >> 54);
     ans[2] = a[2] & 0x7;
 
-    return ans;
 }
 
 __attribute__((target("pclmul,sse2")))
-void gf_mul(vector<uint64_t> &ans, const vector<uint64_t> &a, const vector<uint64_t> &b) {
-    vector<__m128i> t(9);
-    vector<__m128i> m_a(3);
-    vector<__m128i> m_b(3);
+void gf_mul(uint64_t ans[3], const uint64_t a[3], const uint64_t b[3]) {
+    __m128i t[9];
+    __m128i m_a[3];
+    __m128i m_b[3];
     for (uint8_t i = 0; i < 3; i++) {
         m_a[i] = _mm_set_epi64x(0, a[i]);
         m_b[i] = _mm_set_epi64x(0, b[i]);
@@ -63,109 +61,80 @@ void gf_mul(vector<uint64_t> &ans, const vector<uint64_t> &a, const vector<uint6
     uint64_t t8_low = _mm_cvtsi128_si64(t[8]);
     uint64_t t8_high = _mm_cvtsi128_si64(_mm_srli_si128(t[8], 8));
 
-    vector<uint64_t> mod_input(5);
+    uint64_t mod_input[5];
     mod_input[0] = t3_low;
     mod_input[1] = t7_low ^ t3_high;
     mod_input[2] = t8_low ^ t7_high;
     mod_input[3] = t6_low ^ t8_high;
     mod_input[4] = t5_low ^ t6_high;
 
-    ans = gf_mod(mod_input);
+    gf_mod(ans, mod_input);
 }
 
-// void gf_pow2(vector<uint64_t> &ans, const vector<uint64_t> &a) {
-//     vector<uint64_t> mod_input(5);
-//     vector<uint64_t> tmp = a;
-//     uint64_t pattern = 1;
+__attribute__((target("pclmul,sse2")))
+void gf_pow2(uint64_t ans[3], const uint64_t a[3]) {
+    uint64_t mod_input[5];
+    __m128i a0 = _mm_set_epi64x(0, a[0]);
+    __m128i a1 = _mm_set_epi64x(0, a[1]);
+    __m128i a2 = _mm_set_epi64x(0, a[2]);
 
-//     for (uint16_t i = 0; i < 32; i++) {
-//         if (tmp[0] & 1) {
-//             mod_input[0] += pattern;
-//         } 
-//         tmp[0] >>= 1;
-//         pattern <<= 2;
-//     }
-    
-//     pattern = 1;
+    a0 = _mm_clmulepi64_si128(a0, a0, 0x00);
+    a1 = _mm_clmulepi64_si128(a1, a1, 0x00);
+    a2 = _mm_clmulepi64_si128(a2, a2, 0x00);
+    mod_input[0] = _mm_cvtsi128_si64(a0);
+    mod_input[1] = _mm_cvtsi128_si64(_mm_srli_si128(a0, 8));
+    mod_input[2] = _mm_cvtsi128_si64(a1);
+    mod_input[3] = _mm_cvtsi128_si64(_mm_srli_si128(a1, 8));
+    mod_input[4] = _mm_cvtsi128_si64(a2);
 
-//     for (uint16_t i = 0; i < 32; i++) {
-//         if (tmp[0] & 1) {
-//             mod_input[1] += pattern;
-//         }
-//         tmp[0] >>= 1;
-//         pattern <<= 2;
-//     }
+    gf_mod(ans, mod_input);
+}
 
-//     pattern = 1;
-
-//     for (uint16_t i = 0; i < 32; i++) {
-//         if (tmp[1] & 1) {
-//             mod_input[2] += pattern;
-//         }
-//         tmp[1] >>= 1;
-//         pattern <<= 2;
-//     }
-
-//     pattern = 1;
-
-//     for (uint16_t i = 0; i < 32; i++) {
-//         if (tmp[1] & 1) {
-//             mod_input[3] += pattern;
-//         }
-//         tmp[1] >>= 1;
-//         pattern <<= 2;
-//     }
-
-//     for (uint16_t i = 0; i < 3; i++) {
-//         if (tmp[2] & 1) {
-//             mod_input[4] += ((uint64_t) 1 << (i * 2));
-//         }
-//         tmp[2] >>= 1;
-//     }
-
-//     ans = gf_mod(mod_input);
-// }
-
-void gf_inv(vector<uint64_t> &ans, const vector<uint64_t> &y) {
-    vector<uint16_t> n = {1, 2, 4, 8, 16, 32, 65, 130};
-    vector<vector<uint64_t>> x(8, vector<uint64_t>(3, 1));
-    x[0] = y;
+void gf_inv(uint64_t ans[3], const uint64_t y[3]) {
+    uint16_t n[] = {1, 2, 4, 8, 16, 32, 65, 130};
+    uint64_t x0[3], x1[3];
+    memcpy(x0, y, 24);
+    memcpy(x1, y, 24);
     uint16_t a = 0x82;
+    uint64_t tmp[3];
+    memcpy(tmp, x0, 24);
 
     for (uint8_t i = 0; i < 7; i++) {
+        memcpy(x0, x1, 24);
         a <<= 1;
-        vector<uint64_t> tmp = x[i];
 
         if (i == 5) {
-            gf_mul(tmp, x[i], x[i]);
-            x[i + 1] = tmp;
+            gf_pow2(x1, x0);
+            memcpy(x0, x1, 24);
 
             for (uint16_t j = 0; j < n[i]; j++) {
-                vector<uint64_t> tmp2 = tmp;
-                gf_mul(tmp2, tmp, tmp);
-                tmp = tmp2;
+                gf_pow2(tmp, x0);
+                memcpy(x0, tmp, 24);
             }
 
-            vector<uint64_t> mul_result(3);
-            gf_mul(mul_result, x[i + 1], tmp);
-            gf_mul(x[i + 1], mul_result, y);
+            uint64_t mul_result[3];
+            gf_mul(mul_result, x1, x0);
+            gf_mul(x1, mul_result, y);
         }
         else {
-            x[i + 1] = x[i];
+            memcpy(x1, x0, 24);
 
             for (uint16_t j = 0; j < n[i]; j++) {
-                vector<uint64_t> tmp2 = tmp;
-                gf_mul(tmp2, tmp, tmp);
-                tmp = tmp2;
+                gf_pow2(tmp, x0);
+                memcpy(x0, tmp, 24);
             }
 
-            vector<uint64_t> mul_result(3);
-            gf_mul(mul_result, x[i + 1], tmp);
-            x[i + 1] = mul_result;
+            uint64_t mul_result[3];
+            gf_mul(mul_result, x1, x0);
+            memcpy(x1, mul_result, 24);
         }
     }
 
-    gf_mul(ans, x[7], x[7]);
+    gf_pow2(ans, x1);
+}
+
+void gf_inv2(uint64_t ans[3], const uint64_t y[3]) {
+    
 }
 
 int main() {
@@ -181,16 +150,18 @@ int main() {
     #define out stdout
     #endif
 
+    // auto ts = std::chrono::high_resolution_clock::now();
+
     uint32_t operatetimes;
     uint8_t type;
     fread(&operatetimes, sizeof(uint32_t), 1, in);
 
     for (uint32_t i = 0; i < operatetimes; i++) {
         fread(&type, sizeof(uint8_t), 1, in);
-        vector<vector<uint64_t>> num(2, vector<uint64_t>(3));
-        fread(num[0].data(), sizeof(uint64_t), 3, in);
-        fread(num[1].data(), sizeof(uint64_t), 3, in);
-        vector<uint64_t> ans(3);
+        uint64_t num[2][3];
+        fread(&num[0], sizeof(uint64_t), 3, in);
+        fread(&num[1], sizeof(uint64_t), 3, in);
+        uint64_t ans[3];
 
         switch(type) {
             case 0 :
@@ -202,8 +173,7 @@ int main() {
                 break;
 
             case 2 : 
-                gf_mul(ans, num[0], num[0]);
-                // gf_pow2(ans, num[0]);
+                gf_pow2(ans, num[0]);
                 break;
             
             case 3 : 
@@ -211,8 +181,10 @@ int main() {
                 break;
         }
         
-        fwrite(ans.data(), sizeof(uint64_t), 3, out);
+        fwrite(ans, sizeof(uint64_t), 3, out);
     }
 
+    // auto te = std::chrono::high_resolution_clock::now();
+    // std::cout << "Duration " << std::chrono::duration_cast<std::chrono::nanoseconds>(te - ts).count() << "ns" << std::endl;
     return 0;
 }
