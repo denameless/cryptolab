@@ -6,6 +6,35 @@
 #include <immintrin.h>
 using namespace std;
 
+void slli_192(uint64_t ans[3], uint64_t a[3], int shift) {
+    int block = shift / 64, mod = shift % 64;
+
+    ans[2] = a[2 - block] << mod;
+    if (block <= 1) {
+        if (mod != 0) ans[2] |= a[1 - block] >> (64 - mod);
+    }
+    
+    if (block == 0) {
+        ans[1] = a[1] << mod;
+        if (mod != 0) ans[1] |= a[0] >> (64 - mod);
+    }
+    else if (block == 1) {
+        ans[1] = a[0] << mod;
+    }
+    else {
+        ans[1] = 0;
+    }
+
+    if (block == 0) {
+        ans[0] = a[0] << mod;
+    }
+    else {
+        ans[0] = 0;
+    }
+
+    return;
+}
+
 void gf_add(uint64_t ans[3], const uint64_t a[3], const uint64_t b[3]) {
 
     for (uint32_t i = 0; i < 3; i++) {
@@ -91,6 +120,7 @@ void gf_pow2(uint64_t ans[3], const uint64_t a[3]) {
 }
 
 void gf_inv(uint64_t ans[3], const uint64_t y[3]) {
+    /* Fermat's little theorem */
     uint16_t n[] = {1, 2, 4, 8, 16, 32, 65, 130};
     uint64_t x0[3], x1[3];
     memcpy(x0, y, 24);
@@ -133,8 +163,67 @@ void gf_inv(uint64_t ans[3], const uint64_t y[3]) {
     gf_pow2(ans, x1);
 }
 
+// void gf_inv(uint64_t ans[3], const uint64_t y[3]) {
+//     ans[2] = 0, ans[1] = 0, ans[0] = 1;
+//     uint64_t tmp[3], tmp2[3], tmpans[3] = {0, 0, 0};
+//     memcpy(tmp, y, 24);
+//     memcpy(tmp2, y, 24);
+
+//     for (uint16_t i = 0; i < 130; i++) {
+//         gf_pow2(tmp2, tmp);
+//         memcpy(tmp, tmp2, 24);
+//         gf_mul(tmpans, ans, tmp);
+//         memcpy(ans, tmpans, 24);
+//     }
+// }
+
 void gf_inv2(uint64_t ans[3], const uint64_t y[3]) {
-    
+    /* extended Euclidean algorithm */
+    uint64_t v[] = {0x2007, 0x0, 0x8};
+    uint64_t u[3];
+    memcpy(u, y, 24);
+    uint64_t g1[3] = {1, 0, 0}, g2[3] = {0, 0, 0};
+
+    while (u[2] != 0 || u[1] != 0 || u[0] != 1) {
+        int degu = 0;
+        if (u[2] != 0) {
+            degu = 191 - __builtin_clzll(u[2]);
+        }
+        else if (u[1] != 0) {
+            degu = 127 - __builtin_clzll(u[1]);
+        }
+        else {
+            degu = 63 - __builtin_clzll(u[0]);
+        }
+        int degv = 0;
+        if (v[2] != 0) {
+            degv = 191 - __builtin_clzll(v[2]);
+        }
+        else if (v[1] != 0) {
+            degv = 127 - __builtin_clzll(v[1]);
+        }
+        else {
+            degv = 63 - __builtin_clzll(v[0]);
+        }
+
+        int j = degu - degv;
+        if (j < 0) {
+            swap(u, v);
+            swap(g1, g2);
+            j = -j;
+        }
+
+        uint64_t tmp[3] = {0, 0, 0}, tmp2[3] = {0, 0, 0};
+        slli_192(tmp, v, j);
+        gf_add(tmp2, tmp, u);
+        memcpy(u, tmp2, 24);
+
+        slli_192(tmp, g2, j);
+        gf_add(tmp2, tmp, g1);
+        memcpy(g1, tmp2, 24);
+    }
+
+    memcpy(ans, g1, 24);
 }
 
 int main() {
