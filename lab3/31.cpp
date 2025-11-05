@@ -31,10 +31,10 @@ constexpr array<uint8_t, 256> table_fieldmultby14 = [](array<uint8_t, 256> ans) 
             ans[i] ^= 27;
         }
         if ((i >> 6) & 0x01) {
-            ans[i] ^= 27 ^ 54;
+            ans[i] ^= 45;
         }
         if ((i >> 7) & 0x01) {
-            ans[i] ^= 27 ^ 54 ^ 108;
+            ans[i] ^= 65;
         }
     }
 
@@ -52,7 +52,7 @@ constexpr array<uint8_t, 256> table_fieldmultby11 = [](array<uint8_t, 256> ans) 
             ans[i] ^= 54;
         }
         if ((i >> 7) & 0x01) {
-            ans[i] ^= 27 ^ 108;
+            ans[i] ^= 119;
         }
     }
 
@@ -67,10 +67,10 @@ constexpr array<uint8_t, 256> table_fieldmultby13 = [](array<uint8_t, 256> ans) 
             ans[i] ^= 27;
         }
         if ((i >> 6) & 0x01) {
-            ans[i] ^= 27 ^ 54;
+            ans[i] ^= 45;
         }
         if ((i >> 7) & 0x01) {
-            ans[i] ^= 54 ^ 108;
+            ans[i] ^= 90;
         }
     }
 
@@ -95,7 +95,7 @@ constexpr array<uint8_t, 256> table_fieldmultby9 = [](array<uint8_t, 256> ans) {
     return ans;
 }(table_fieldmultby9);
 
-const uint8_t Sbox[256] = {
+constexpr uint8_t Sbox[256] = {
     0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
     0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
     0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -114,7 +114,7 @@ const uint8_t Sbox[256] = {
     0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
 };
 
-const uint8_t Sbox_inv[256] = {
+constexpr uint8_t Sbox_inv[256] = {
     0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
     0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
     0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
@@ -133,190 +133,76 @@ const uint8_t Sbox_inv[256] = {
     0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
 };
 
-void addroundkey(uint8_t txt[16], uint8_t key[16]) {
+inline void addroundkey(uint8_t txt[16], const uint8_t key[16]) {
     for (uint8_t i = 0; i < 16; i++) {
         txt[i] ^= key[i];
     }
 }
 
-void subbytesin128(uint8_t txt[16]) {
+inline void subbytesin128(uint8_t txt[16]) {
     for (int i = 0; i < 16; i++) {
         txt[i] = Sbox[txt[i]];
     }
 }
 
-void subbytesin128_inv(uint8_t txt[16]) {
+inline void subbytesin128_inv(uint8_t txt[16]) {
     for (int i = 0; i < 16; i++) {
         txt[i] = Sbox_inv[txt[i]];
     }
 }
 
-void shiftrows(uint8_t txt[16]) {
-    for (uint8_t i = 0; i < 4; i++) {
-        for (uint8_t j = 0; j < i; j++) {
-            for (uint8_t k = 0; k < 3; k++) {
-                swap(txt[k * 4 + i], txt[(k + 1) * 4 + i]);
-            }
-        }
-    }
+inline void shiftrows(uint8_t txt[16]) {
+    swap(txt[1], txt[5]), swap(txt[5], txt[9]), swap(txt[9], txt[13]);
+
+    swap(txt[2], txt[10]), swap(txt[6], txt[14]);
+
+    swap(txt[15], txt[11]), swap(txt[11], txt[7]), swap(txt[7], txt[3]);
 }
 
-void shiftrows_inv(uint8_t txt[16]) {
-    for (uint8_t i = 0; i < 4; i++) {
-        for (uint8_t j = 0; j < i; j++) {
-            for (int k = 2; k >= 0; k--) {
-                swap(txt[k * 4 + i], txt[(k + 1) * 4 + i]);
-            }
-        }
-    }
+inline void shiftrows_inv(uint8_t txt[16]) {
+    swap(txt[13], txt[9]), swap(txt[9], txt[5]), swap(txt[5], txt[1]);
+
+    swap(txt[2], txt[10]), swap(txt[6], txt[14]);
+
+    swap(txt[3], txt[7]), swap(txt[7], txt[11]), swap(txt[11], txt[15]);
 }
 
-// void fieldmol(uint16_t &x) {
-//     uint16_t ruler = x >> 8;
-//     x &= 0xff;
-//     x ^= ruler;
-//     x ^= (ruler << 1);
-//     x ^= (ruler << 3);
-//     x ^= (ruler << 4);
-//     x ^= (ruler << 8);
-//     x &= 0xff;
-// }
-
-// uint8_t fieldmult(uint8_t x, uint8_t y) {
-//     uint16_t ans = 0;
-    
-//     for (uint8_t i = 0; i < 8; i++) {
-//         for (uint8_t j = 0; j < 8; j++) {
-//             ans ^= (x >> i) & (y >> j) & 0x01 ? (1 << (i + j)) : 0; 
-//         }
-//     }
-
-//     fieldmol(ans);
-//     return ans;
-// } 
-
-// uint8_t fieldmultby2(uint8_t x) {
-//     if (x < 128) {
-//         return x << 1;
-//     }
-//     else {
-//         return (x << 1) ^ 27;
-//     }
-// }
-
-// uint8_t fieldmultby3(uint8_t x) {
-//     if (x < 128) {
-//         return x ^ (x << 1);
-//     }
-//     else {
-//         return x ^ (x << 1) ^ 27;
-//     }
-// }
-
-// uint8_t fieldmultby14(uint8_t x) {
-//     /*0x0e*/
-//     uint16_t ans = 0;
-//     ans ^= (x << 1) ^ (x << 2) ^ (x << 3);
-
-//     if ((x >> 5) & 0x01) {
-//         ans ^= 27;
-//     }
-//     if ((x >> 6) & 0x01) {
-//         ans ^= 27 ^ 54;
-//     }
-//     if ((x >> 7) & 0x01) {
-//         ans ^= 27 ^ 54 ^ 108;
-//     }
-
-//     return ans;
-// }
-
-// uint8_t fieldmultby11(uint8_t x) {
-//     /*0x0b*/
-//     uint16_t ans = x;
-//     ans ^= (x << 1) ^ (x << 3);
-
-//     if ((x >> 5) & 0x01) {
-//         ans ^= 27;
-//     }
-//     if ((x >> 6) & 0x01) {
-//         ans ^= 54;
-//     }
-//     if ((x >> 7) & 0x01) {
-//         ans ^= 27 ^ 108;
-//     }
-
-//     return ans;
-// }
-
-// uint8_t fieldmultby13(uint8_t x) {
-//     /*0x0d*/
-//     uint16_t ans = x;
-//     ans ^= (x << 2) ^ (x << 3);
-
-//     if ((x >> 5) & 0x01) {
-//         ans ^= 27;
-//     }
-//     if ((x >> 6) & 0x01) {
-//         ans ^= 27 ^ 54;
-//     }
-//     if ((x >> 7) & 0x01) {
-//         ans ^= 54 ^ 108;
-//     }
-
-//     return ans;
-// }
-
-// uint8_t fieldmultby9(uint8_t x) {
-//     /*0x09*/
-//     uint16_t ans = x;
-//     ans ^= (x << 3);
-
-//     if ((x >> 5) & 0x01) {
-//         ans ^= 27;
-//     }
-//     if ((x >> 6) & 0x01) {
-//         ans ^= 54;
-//     }
-//     if ((x >> 7) & 0x01) {
-//         ans ^= 108;
-//     }
-
-//     return ans;
-// }
 
 void mixcolumns(uint8_t txt[16]) {
-    for (uint8_t i = 0; i < 4; i++) {
-        uint8_t u[] = {0, 0, 0, 0};
-        u[0] = table_fieldmultby2[txt[i * 4]] ^ table_fieldmultby3[txt[i * 4 + 1]] ^ txt[i * 4 + 2] ^ txt[i * 4 + 3];
-        u[1] = table_fieldmultby2[txt[i * 4 + 1]] ^ table_fieldmultby3[txt[i * 4 + 2]] ^ txt[i * 4 + 3] ^ txt[i * 4];
-        u[2] = table_fieldmultby2[txt[i * 4 + 2]] ^ table_fieldmultby3[txt[i * 4 + 3]] ^ txt[i * 4] ^ txt[i * 4 + 1];
-        u[3] = table_fieldmultby2[txt[i * 4 + 3]] ^ table_fieldmultby3[txt[i * 4]] ^ txt[i * 4 + 1] ^ txt[i * 4 + 2];
+    uint8_t u[] = {0, 0, 0, 0};
 
-        txt[i * 4] = u[0];
-        txt[i * 4 + 1] = u[1];
-        txt[i * 4 + 2] = u[2];
-        txt[i * 4 + 3] = u[3];
+    for (uint8_t i = 0; i < 4; i++) {
+        uint8_t a = i << 2, b = (i << 2) + 1, c = (i << 2) + 2, d = (i << 2) + 3;
+        u[0] = table_fieldmultby2[txt[a]] ^ table_fieldmultby3[txt[b]] ^ txt[c] ^ txt[d];
+        u[1] = table_fieldmultby2[txt[b]] ^ table_fieldmultby3[txt[c]] ^ txt[d] ^ txt[a];
+        u[2] = table_fieldmultby2[txt[c]] ^ table_fieldmultby3[txt[d]] ^ txt[a] ^ txt[b];
+        u[3] = table_fieldmultby2[txt[d]] ^ table_fieldmultby3[txt[a]] ^ txt[b] ^ txt[c];
+
+        txt[a] = u[0];
+        txt[b] = u[1];
+        txt[c] = u[2];
+        txt[d] = u[3];
     }
-} 
+}
 
 void mixcolumns_inv(uint8_t txt[16]) {
+    uint8_t u[] = {0, 0, 0, 0};
 
     for (uint8_t i = 0; i < 4; i++) {
-        uint8_t u[] = {0, 0, 0, 0};
-        u[0] = table_fieldmultby14[txt[i * 4]] ^ table_fieldmultby11[txt[i * 4 + 1]] ^ table_fieldmultby13[txt[i * 4 + 2]] ^ table_fieldmultby9[txt[i * 4 + 3]];
-        u[1] = table_fieldmultby14[txt[i * 4 + 1]] ^ table_fieldmultby11[txt[i * 4 + 2]] ^ table_fieldmultby13[txt[i * 4 + 3]] ^ table_fieldmultby9[txt[i * 4]];
-        u[2] = table_fieldmultby14[txt[i * 4 + 2]] ^ table_fieldmultby11[txt[i * 4 + 3]] ^ table_fieldmultby13[txt[i * 4]] ^ table_fieldmultby9[txt[i * 4 + 1]];
-        u[3] = table_fieldmultby14[txt[i * 4 + 3]] ^ table_fieldmultby11[txt[i * 4]] ^ table_fieldmultby13[txt[i * 4 + 1]] ^ table_fieldmultby9[txt[i * 4 + 2]];
+        uint8_t a = i << 2, b = (i << 2) + 1, c = (i << 2) + 2, d = (i << 2) + 3;
+        u[0] = table_fieldmultby14[txt[a]] ^ table_fieldmultby11[txt[b]] ^ table_fieldmultby13[txt[c]] ^ table_fieldmultby9[txt[d]];
+        u[1] = table_fieldmultby14[txt[b]] ^ table_fieldmultby11[txt[c]] ^ table_fieldmultby13[txt[d]] ^ table_fieldmultby9[txt[a]];
+        u[2] = table_fieldmultby14[txt[c]] ^ table_fieldmultby11[txt[d]] ^ table_fieldmultby13[txt[a]] ^ table_fieldmultby9[txt[b]];
+        u[3] = table_fieldmultby14[txt[d]] ^ table_fieldmultby11[txt[a]] ^ table_fieldmultby13[txt[b]] ^ table_fieldmultby9[txt[c]];
 
-        txt[i * 4] = u[0];
-        txt[i * 4 + 1] = u[1];
-        txt[i * 4 + 2] = u[2];
-        txt[i * 4 + 3] = u[3];
+        txt[a] = u[0];
+        txt[b] = u[1];
+        txt[c] = u[2];
+        txt[d] = u[3];
     }
 } 
 
-void rotword(uint8_t* txt) {
+inline void rotword(uint8_t* txt) {
     uint8_t tmp = txt[0];
     txt[0] = txt[1];
     txt[1] = txt[2];
@@ -324,61 +210,21 @@ void rotword(uint8_t* txt) {
     txt[3] = tmp;
 }
 
-void subword(uint8_t* txt) {
+inline void subword(uint8_t* txt) {
     txt[0] = Sbox[txt[0]];
     txt[1] = Sbox[txt[1]];
     txt[2] = Sbox[txt[2]];
     txt[3] = Sbox[txt[3]];
 }
 
-void keyexpansion(uint8_t key[16], uint8_t* w) {
-    uint8_t rcon[11][4] = {
-        {0, 0, 0, 0}, 
-        {0x01, 0x00, 0x00, 0x00},
-        {0x02, 0x00, 0x00, 0x00},
-        {0x04, 0x00, 0x00, 0x00}, 
-        {0x08, 0x00, 0x00, 0x00}, 
-        {0x10, 0x00, 0x00, 0x00}, 
-        {0x20, 0x00, 0x00, 0x00}, 
-        {0x40, 0x00, 0x00, 0x00}, 
-        {0x80, 0x00, 0x00, 0x00}, 
-        {0x1b, 0x00, 0x00, 0x00}, 
-        {0x36, 0x00, 0x00, 0x00}
-    };
-
-    for (uint8_t i = 0; i < 4; i++) {
-        uint8_t tmp[] = {key[4 * i], key[4 * i + 1], key[4 * i + 2], key[4 * i + 3]};
-        memcpy(&w[i * 4], tmp, 4);
-    }
-
-    for (uint8_t i = 4; i < 44; i++) {
-        uint8_t tmp[4];
-        memcpy(&tmp, &w[i * 4 - 4], 4);
-
-        if (i % 4 == 0) {
-            rotword(tmp);
-            subword(tmp);
-            for (uint8_t j = 0; j < 4; j++) {
-                tmp[j] ^= rcon[i / 4][j];
-            }
-        } 
-
-        for (uint8_t j = 0; j < 4; j++) {
-            w[i * 4 + j] = w[(i - 4) * 4 + j] ^ tmp[j];
-        }
-
-    } 
-
-}
-
-void AESencrypt(uint8_t txt[16], uint8_t expandedkey[16]) {
+void AESencrypt(uint8_t txt[16], const uint8_t expandedkey[16]) {
     addroundkey(txt, &expandedkey[0]);
 
     for (uint8_t i = 1; i <= 9; i++) {
         subbytesin128(txt);
         shiftrows(txt);
         mixcolumns(txt);
-        addroundkey(txt, &expandedkey[i * 16]);
+        addroundkey(txt, &expandedkey[i << 4]);
     }
 
     subbytesin128(txt);
@@ -386,13 +232,13 @@ void AESencrypt(uint8_t txt[16], uint8_t expandedkey[16]) {
     addroundkey(txt, &expandedkey[160]);
 }
 
-void AESdecrypt(uint8_t txt[16], uint8_t expandedkey[16]) {
+void AESdecrypt(uint8_t txt[16], const uint8_t expandedkey[16]) {
     addroundkey(txt, &expandedkey[160]);
     shiftrows_inv(txt);
     subbytesin128_inv(txt);
 
     for (int i = 9; i >= 1; i--) {
-        addroundkey(txt, &expandedkey[i * 16]);
+        addroundkey(txt, &expandedkey[i << 4]);
         mixcolumns_inv(txt);
         shiftrows_inv(txt);
         subbytesin128_inv(txt);
@@ -401,7 +247,7 @@ void AESdecrypt(uint8_t txt[16], uint8_t expandedkey[16]) {
     addroundkey(txt, &expandedkey[0]);
 }
 
-void CBCencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void CBCencrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     for (uint8_t j = 0; j < 16; j++) {
         txt[j] ^= y[j];
     }
@@ -410,7 +256,7 @@ void CBCencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     memcpy(y, &txt[0], 16);
 }
 
-void CBCdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void CBCdecrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     uint8_t tmp[16];
     memcpy(tmp, &txt[0], 16);
 
@@ -422,15 +268,15 @@ void CBCdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     memcpy(y, tmp, 16);
 }
 
-void ECBencrypt(uint8_t* txt, uint8_t* expandedkey) {
+void ECBencrypt(uint8_t* txt, const uint8_t* expandedkey) {
     AESencrypt(&txt[0], expandedkey);
 }
 
-void ECBdecrypt(uint8_t* txt, uint8_t* expandedkey) {
+void ECBdecrypt(uint8_t* txt, const uint8_t* expandedkey) {
     AESdecrypt(&txt[0], expandedkey);
 }
 
-void OFBencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void OFBencrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     AESencrypt(y, expandedkey);
     
     for (uint8_t j = 0; j < 16; j++) {
@@ -438,7 +284,7 @@ void OFBencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     }
 }
 
-void OFBdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void OFBdecrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     AESencrypt(y, expandedkey);
     
     for (uint8_t j = 0; j < 16; j++) {
@@ -446,7 +292,7 @@ void OFBdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     }
 }
 
-void CFBencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void CFBencrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     AESencrypt(y, expandedkey);
 
     for (uint8_t j = 0; j < 16; j++) {
@@ -456,7 +302,7 @@ void CFBencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     memcpy(y, txt, 16);
 }
 
-void CFBdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
+void CFBdecrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t y[16]) {
     uint8_t tmp[16];
     AESencrypt(y, expandedkey);
     memcpy(tmp, txt, 16);
@@ -467,7 +313,7 @@ void CFBdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t y[16]) {
     memcpy(y, tmp, 16);
 }
 
-void CTRencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t cnt[16], uint8_t y[16]) {
+void CTRencrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t cnt[16], uint8_t y[16]) {
     memcpy(y, cnt, 16);
     AESencrypt(y, expandedkey);
 
@@ -476,7 +322,7 @@ void CTRencrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t cnt[16], uint8_t y[1
     }
 }
 
-void CTRdecrypt(uint8_t* txt, uint8_t* expandedkey, uint8_t cnt[16], uint8_t y[16]) {
+void CTRdecrypt(uint8_t* txt, const uint8_t* expandedkey, uint8_t cnt[16], uint8_t y[16]) {
     memcpy(y, cnt, 16);
     AESencrypt(y, expandedkey);
 
@@ -505,54 +351,88 @@ int main() {
     fread(&len, sizeof(uint32_t), 1, in);
 
     uint8_t expandedkey[176];
-    keyexpansion(key, expandedkey);
 
     uint8_t y[16];
     memcpy(y, IV, 16);
 
-    uint32_t extend = (len % 16) == 0 ? 16 : 16 - len % 16;
+    const uint8_t rcon[11][4] = {
+        {0, 0, 0, 0}, 
+        {0x01, 0x00, 0x00, 0x00},
+        {0x02, 0x00, 0x00, 0x00},
+        {0x04, 0x00, 0x00, 0x00}, 
+        {0x08, 0x00, 0x00, 0x00}, 
+        {0x10, 0x00, 0x00, 0x00}, 
+        {0x20, 0x00, 0x00, 0x00}, 
+        {0x40, 0x00, 0x00, 0x00}, 
+        {0x80, 0x00, 0x00, 0x00}, 
+        {0x1b, 0x00, 0x00, 0x00}, 
+        {0x36, 0x00, 0x00, 0x00}
+    };
+
+    for (uint8_t i = 0; i < 4; i++) {
+        memcpy(&expandedkey[i << 2], &key[i << 2], 4);
+    }
+
+    for (uint8_t i = 4; i < 44; i++) {
+        uint8_t tmp[4];
+        memcpy(&tmp, &expandedkey[(i << 2) - 4], 4);
+
+        if (i % 4 == 0) {
+            rotword(tmp);
+            subword(tmp);
+            for (uint8_t j = 0; j < 4; j++) {
+                tmp[j] ^= rcon[i >> 2][j];
+            }
+        } 
+
+        for (uint8_t j = 0; j < 4; j++) {
+            expandedkey[(i << 2) + j] = expandedkey[((i - 4) << 2) + j] ^ tmp[j];
+        }
+
+    }
+
+    const uint32_t extend = ((len % 16) == 0 ? 16 : 16 - len % 16);
+
+    const uint32_t block = (len >> 4) - 1;
+    const uint32_t extendedblock = ((len + extend) >> 4) - 1;
 
     switch(mod) {
         case 0x01 :
-            for (long long i = 0; i < (len + extend) / 16; i++) {
-                if (i != (len + extend) / 16 - 1) {
-                    fread(txt, sizeof(uint8_t), 16, in);
-                }
-
-                else {
-                    fread(txt, sizeof(uint8_t), 16 - extend, in);
-                    for (int j = 16 - extend; j < 16; j++) {
-                        txt[j] = extend;
-                    }
-                }
+            for (int i = 0; i < extendedblock; i++) {
+                fread(txt, sizeof(uint8_t), 16, in);
                 CBCencrypt(txt, expandedkey, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
             }
+
+            fread(txt, sizeof(uint8_t), 16 - extend, in);
+            for (int j = 16 - extend; j < 16; j++) {
+                txt[j] = extend;
+            }
+            CBCencrypt(txt, expandedkey, y);
+            fwrite(txt, sizeof(uint8_t), 16, out);
             break;
 
         case 0x81 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < block; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 CBCdecrypt(txt, expandedkey, y);
-                if (i != len / 16 - 1) {
-                    fwrite(txt, sizeof(uint8_t), 16, out);
-                }
-                else {
-                    uint32_t expected_extend = txt[15];
-                    for (long long i = 15; i > 16 - expected_extend; i--) {
-                        if (txt[i] != txt[i - 1]) {
-                            fwrite(txt, sizeof(uint8_t), 16, out);
-                            return 0;
-                        }
-                    }
+                fwrite(txt, sizeof(uint8_t), 16, out);
+            }
 
-                    fwrite(txt, sizeof(uint8_t), 16 - expected_extend, out);
+            fread(txt, sizeof(uint8_t), 16, in);
+            CBCdecrypt(txt, expandedkey, y);
+            uint32_t expected_extend = txt[15];
+            for (long long i = 15; i > 16 - expected_extend; i--) {
+                if (txt[i] != txt[i - 1]) {
+                    fwrite(txt, sizeof(uint8_t), 16, out);
+                    return 0;
                 }
             }
+            fwrite(txt, sizeof(uint8_t), 16 - expected_extend, out);
             break;
         
         case 0x00 : 
-            for (long long i = 0; i < (len + extend) / 16; i++) {
+            for (int i = 0; i < (len + extend) / 16; i++) {
                 if (i != (len + extend) / 16 - 1) {
                     fread(txt, sizeof(uint8_t), 16, in);
                 }
@@ -569,7 +449,7 @@ int main() {
             break;
         
         case 0x80 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
 
                 ECBdecrypt(txt, expandedkey);
@@ -592,7 +472,7 @@ int main() {
             break;
 
         case 0x02 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 CFBencrypt(txt, expandedkey, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
@@ -610,7 +490,7 @@ int main() {
             break;
 
         case 0x82 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 CFBdecrypt(txt, expandedkey, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
@@ -629,7 +509,7 @@ int main() {
             break;
 
         case 0x03 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 OFBencrypt(txt, expandedkey, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
@@ -647,7 +527,7 @@ int main() {
             break;
 
         case 0x83 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 OFBdecrypt(txt, expandedkey, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
@@ -665,7 +545,7 @@ int main() {
             break;
 
         case 0x04 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 CTRencrypt(txt, expandedkey, IV, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
@@ -693,7 +573,7 @@ int main() {
             break;
 
         case 0x84 :
-            for (long long i = 0; i < len / 16; i++) {
+            for (int i = 0; i < len / 16; i++) {
                 fread(txt, sizeof(uint8_t), 16, in);
                 CTRdecrypt(txt, expandedkey, IV, y);
                 fwrite(txt, sizeof(uint8_t), 16, out);
