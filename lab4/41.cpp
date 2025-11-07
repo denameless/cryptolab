@@ -73,47 +73,58 @@ int main() {
 
     uint64_t len = 0;
     uint32_t w[64] = {0};
-
-    uint64_t curlen = fread(w, sizeof(uint8_t), 64, in);
+    uint64_t curlen = 0;
+    uint32_t u32 = 0;
     
-    while (curlen == 64) {
-        len += curlen;
+    while (1) {
+        u32 = 0;
+        curlen = fread(&u32, sizeof(uint8_t), 4, in);
 
-        sha256(H, h, w);
+        if (curlen == 4) {
+            w[(len >> 2) % 16] = __builtin_bswap32(u32);
+            len += curlen;
 
-        uint64_t curlen = fread(w, sizeof(uint8_t), 64, in);
+            if (len % 64 == 0) {
+                sha256(H, h, w);
+                memset(w, 0, 64);
+            }
+        }
+        else {
+            break;
+        }
     }
 
-    if (curlen % 64 < 56) {
+    if (curlen != 0) {
+        w[(len >> 2) % 16] = __builtin_bswap32(u32) | 1 << (31 - (curlen << 3));
         len += curlen;
-        uint64_t tmp = 31 - ((curlen % 4) * 8);
-        w[curlen / 4] |= 1 << tmp;
-        *((uint64_t*) &w[14]) = len;
-
-        sha256(H, h, w);
-
-        fwrite(H, sizeof(uint16_t), 16, out);
     }
-
     else {
-        len += curlen;
-        w[curlen / 4] |= 1 << (31 - ((curlen % 4) * 8));
-        for (int i = curlen / 4 + 1; i < 64; i++) {
-            w[i] = 0;
+        w[(len >> 2) % 16] |= 1 << 31;
+    }
+
+    if ((len % 64 < 56) && (len % 64 > 0)) {
+        w[14] = (uint32_t) (len >> 29);
+        w[15] = (uint32_t) (len << 3) & 0xffffffff;
+        sha256(H, h, w);
+    }
+    else {
+        if (len % 64 != 0) {
+            sha256(H, h, w);
+            memset(w, 0, 62);
+        }
+        else {
+            memset(w, 0, 62);
+            w[(len >> 2) % 16] |= 1 << 31;
         }
 
+        w[14] = (uint32_t) (len >> 29);
+        w[15] = (uint32_t) (len << 3) & 0xffffffff;
         sha256(H, h, w);
+    }
 
-        w[0] = 0x80000000;
-
-        for (int i = 1; i < 14; i++) {
-            w[i] = 0;
-        }
-        *((uint64_t*) &w[14]) = len;
-
-        sha256(H, h, w);
-
-        fwrite(H, sizeof(uint32_t), 8, out);
+    for (int i = 0; i < 8; i++) {
+        uint32_t tmp = __builtin_bswap32(H[i]);
+        fwrite(&tmp, sizeof(uint32_t), 1, out);
     }
 
     return 0;
