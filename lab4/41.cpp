@@ -3,7 +3,9 @@
 #include <fcntl.h>
 #endif
 
-uint8_t buffer[0x200];
+#define BUFFER_BLOCK_SIZE 0x80000
+
+uint32_t buffer[BUFFER_BLOCK_SIZE >> 2];
 
 uint32_t k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
@@ -57,7 +59,7 @@ int main() {
     setmode(fileno(stdout), O_BINARY);
     #endif
     #ifndef ONLINE_JUDGE
-    FILE* in = fopen("dump.bin", "rb");
+    FILE* in = fopen("41standard.bin", "rb");
     FILE* out = fopen("41output.bin", "wb");
     #else
     #define in stdin
@@ -74,33 +76,51 @@ int main() {
     uint64_t len = 0;
     uint32_t w[64] = {0};
     uint64_t curlen = 0;
-    uint32_t u32 = 0;
+
+    /* w里看到的字节，作大小端转换后就是算法流程中阅读到的 */
     
     while (1) {
-        u32 = 0;
-        curlen = fread(&u32, sizeof(uint8_t), 4, in);
+        curlen = fread(buffer, sizeof(uint8_t), BUFFER_BLOCK_SIZE, in);
 
-        if (curlen == 4) {
-            w[(len >> 2) % 16] = __builtin_bswap32(u32);
-            len += curlen;
+        if (curlen == BUFFER_BLOCK_SIZE) {
+            len += BUFFER_BLOCK_SIZE;
+            for (uint32_t i = 0; i < BUFFER_BLOCK_SIZE >> 6; i++) {
+                for (uint32_t j = 0; j < 16; j++) {
+                    buffer[(i << 4) + j] = __builtin_bswap32(buffer[(i << 4) + j]);
+                }
 
-            if (len % 64 == 0) {
+                memcpy(w, &buffer[i << 4], 64);
                 sha256(H, h, w);
-                memset(w, 0, 64);
             }
+
         }
         else {
             break;
         }
     }
 
-    if (curlen != 0) {
-        w[(len >> 2) % 16] = __builtin_bswap32(u32) | 1 << (31 - (curlen << 3));
-        len += curlen;
+    for (uint32_t i = 0; i < curlen >> 6; i++) {
+        for (uint32_t j = 0; j < 16; j++) {
+            buffer[(i << 4) + j] = __builtin_bswap32(buffer[(i << 4) + j]);
+        }
+
+        memcpy(w, &buffer[i << 4], 64);
+        sha256(H, h, w);
     }
-    else {
-        w[(len >> 2) % 16] |= 1 << 31;
+
+    memset(&reinterpret_cast<uint8_t*>(buffer)[curlen], 0, BUFFER_BLOCK_SIZE - curlen);
+
+    for (uint32_t i = 0; i < 16; i++) {
+        buffer[((curlen >> 6) << 4) + i] = __builtin_bswap32(buffer[((curlen >> 6) << 4) + i]);
     }
+
+    memcpy(w, &buffer[(curlen >> 6) << 4], 64);
+
+    len += (curlen >> 6) << 6;
+    curlen %= 64;
+
+    w[curlen >> 2] |= 1 << (31 - ((curlen % 4) << 3));
+    len += curlen;
 
     if ((len % 64 < 56) && (len % 64 > 0)) {
         w[14] = (uint32_t) (len >> 29);
