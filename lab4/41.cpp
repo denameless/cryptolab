@@ -77,8 +77,6 @@ int main() {
     uint32_t w[64] = {0};
     uint64_t curlen = 0;
 
-    /* w里看到的字节，作大小端转换后就是算法流程中阅读到的 */
-    
     while (1) {
         curlen = fread(buffer, sizeof(uint8_t), BUFFER_BLOCK_SIZE, in);
 
