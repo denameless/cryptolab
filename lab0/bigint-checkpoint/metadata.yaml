@@ -1,0 +1,40 @@
+- input: check0.in.txt
+  mode: text
+  note: '样例 #1'
+  output: check0.out.txt
+- input: check1.in.txt
+  mode: text
+  note: '样例 #2'
+  output: check1.out.txt
+- input: check2.in.txt
+  mode: text
+  note: '样例 #3'
+  output: check2.out.txt
+- input: check3.in.txt
+  mode: text
+  note: '样例 #4'
+  output: check3.out.txt
+- input: check4.in.txt
+  mode: text
+  note: '样例 #5'
+  output: check4.out.txt
+- input: check5.in.txt
+  mode: text
+  note: 256 bit ×50
+  output: check5.out.txt
+- input: check6.in.txt
+  mode: text
+  note: 256 bit ×100
+  output: check6.out.txt
+- input: check7.in.txt
+  mode: text
+  note: 512 bit ×100
+  output: check7.out.txt
+- input: check8.in.txt
+  mode: text
+  note: 1024 bit ×100
+  output: check8.out.txt
+- input: check9.in.txt
+  mode: text
+  note: 2048 bit ×100
+  output: check9.out.txt
