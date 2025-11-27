@@ -7,38 +7,20 @@
 
 /* all operands are 2048 or 2049 bits */
 
-const uint64_t constone[32] = {
-    1ULL, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-};
+uint64_t compute_neg_m_inverse(uint64_t* m) {
+    uint64_t cur = m[0];
+    uint64_t ans = 1;
 
-uint64_t two[32] = {
-    2ULL, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-};
+    for (uint64_t i = 1; i < 64; i++) {
+        uint64_t tmp = m[0] << i;
+        if ((1ULL << i) & cur) {
+            cur += tmp;
+            ans += (1ULL << i);
+        }
+    }
 
-constexpr uint64_t two_pow2047[32] = {
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, (1ULL << 63),
-};
+    return -ans;
+}
 
 uint32_t count_leading_zero(uint64_t* a) {
     uint32_t ans = 0;
@@ -138,7 +120,10 @@ inline void trivial_multiple_precision_subtraction(uint64_t* a, uint64_t* b, uin
     uint64_t c = 0;
 
     for (int i = 0; i < 32; i++) {
-        if (a[i] == 0 && b[i] == 0 && c == 0) continue;
+        if (a[i] == 0 && b[i] == 0 && c == 0) {
+            ans[i] = 0ULL;
+            continue;
+        }
 
         uint64_t tmp = a[i] - c - b[i];
 
@@ -232,9 +217,11 @@ inline bool trivial_multiple_precision_addition_v2(uint64_t* a, uint64_t* b, uin
     uint64_t tmp = a[32] + b[32] + c;
 
     if ((c == 1 && (tmp <= a[32] || tmp <= b[32])) || (c == 0 && tmp < a[32] && tmp < b[32])) {
+        ans[32] = tmp;
         return true;
     }
     else {
+        ans[32] = tmp;
         return false;
     }
 }
@@ -270,6 +257,9 @@ inline bool trivial_multiple_precision_addition_v3(uint64_t* a, uint64_t* b, uin
         ans[32] = tmp & 1ULL;
         return false;
     }
+    // tmp &= 1ULL;
+    // if (!a[32] && !b[32]) tmp &= 0ULL;
+    // return true;
 }
 
 inline void rlli(uint64_t* a) {
@@ -305,6 +295,7 @@ inline void mult_by_2(uint64_t* a) {
 
         ok = tmp;
     }
+    a[32] |= ok ? 1 : 0;
 }
 
 bool cmp_2048bits(const uint64_t* a, const uint64_t* b) {
@@ -355,10 +346,11 @@ inline void montgomery_init_module(uint64_t* a, uint64_t* m) {
     for (int i = 0; i < 4096; i++) {
         mult_by_2(a);
 
-        if (cmp_2048bits(a, m)) {
-            trivial_multiple_precision_subtraction(a, m, a);
+        if (cmp_2049bits(a, m)) {
+            trivial_multiple_precision_subtraction_v2(a, m, a);
         }
     }
+    return;
 }
 
 inline void montgomery_init_module_v2(uint64_t* a, uint64_t* m) {
@@ -366,46 +358,89 @@ inline void montgomery_init_module_v2(uint64_t* a, uint64_t* m) {
     for (int i = 0; i < 2048; i++) {
         mult_by_2(a);
 
-        if (cmp_2048bits(a, m)) {
-            trivial_multiple_precision_subtraction(a, m, a);
+        if (cmp_2049bits(a, m)) {
+            trivial_multiple_precision_subtraction_v2(a, m, a);
         }
     }
 }
 
-inline void montgomery_multiplication(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans) {
-    /* OUTPUT: (x * y * (R^-1)) mod m */
-    uint64_t A[33] = {0};
-    uint64_t t = A[32];
-    int y_0 = y[0] & 1;
-    uint64_t y_extend[33] = {0};
-    memcpy(y_extend, y, 256);
-    uint64_t m_extend[33] = {0};
-    memcpy(m_extend, m, 256);
-    uint64_t yplusm[33] = {0};
-    trivial_multiple_precision_addition_v2(y_extend, m_extend, yplusm);
+// inline void montgomery_multiplication(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans) {
+//     /* OUTPUT: (x * y * (R^-1)) mod m */
+//     uint64_t A[33] = {0};
+//     uint64_t t = A[32];
+//     int y_0 = y[0] & 1;
+//     uint64_t y_extend[33] = {0};
+//     memcpy(y_extend, y, 256);
+//     uint64_t m_extend[33] = {0};
+//     memcpy(m_extend, m, 256);
+//     uint64_t yplusm[33] = {0};
+//     trivial_multiple_precision_addition_v2(y_extend, m_extend, yplusm);
 
-    for (int i = 0; i < 2048; i++) {
-        int x_i = (x[i >> 6] >> (i % 64)) & 1;
-        int a_0 = A[0] & 1;
-        int u_i = (a_0 + x_i * y_0) % 2;
+//     for (int i = 0; i < 2048; i++) {
+//         int x_i = (x[i >> 6] >> (i % 64)) & 1;
+//         int a_0 = A[0] & 1;
+//         int u_i = (a_0 + x_i * y_0) % 2;
 
-        if (x_i && u_i) {
-            trivial_multiple_precision_addition_v3(A, yplusm, A);
+//         if (x_i && u_i) {
+//             trivial_multiple_precision_addition_v3(A, yplusm, A);
+//         }
+//         else if (x_i) {
+//             trivial_multiple_precision_addition_v2(A, y_extend, A);
+//         }
+//         else if (u_i) {
+//             trivial_multiple_precision_addition_v2(A, m_extend, A);
+//         }
+//         rlli(A);
+//     }
+
+//     if (A[32] > 0 || cmp_2048bits(A, m)) {
+//         trivial_multiple_precision_subtraction(A, m, A);
+//     }
+
+//     memcpy(ans, A, 256);
+// }
+
+inline void montgomery_multiplication_v2(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans, uint64_t neg_m_inverse) {
+    uint64_t T[34] = {0}; 
+
+    for (int i = 0; i < 32; i++) {
+        __uint128_t carry = 0;
+
+        for (int j = 0; j < 32; j++) {
+            __uint128_t tmp = (__uint128_t) x[i] * (__uint128_t) y[j] + (__uint128_t) T[j] + carry;
+            T[j] = (uint64_t) tmp;
+            carry = tmp >> 64;
         }
-        else if (x_i) {
-            trivial_multiple_precision_addition_v2(A, y_extend, A);
+        __uint128_t tmp2 = (__uint128_t) T[32] + carry;
+        T[32] = (uint64_t) tmp2;
+        T[33] = tmp2 >> 64;
+
+        uint64_t u = T[0] * neg_m_inverse;
+
+        __uint128_t tmp3 = (__uint128_t) u * (__uint128_t) m[0] + (__uint128_t) T[0];
+        carry = tmp3 >> 64;
+        
+        for (int j = 1; j < 32; j++) {
+            __uint128_t tmp4 = (__uint128_t) u * (__uint128_t) m[j] + (__uint128_t) T[j] + (__uint128_t) carry;
+            T[j - 1] = (uint64_t) tmp4;
+            carry = tmp4 >> 64;
         }
-        else if (u_i) {
-            trivial_multiple_precision_addition_v2(A, m_extend, A);
-        }
-        rlli(A);
+
+        __uint128_t tmp5 = (__uint128_t) T[32] + carry;
+        T[31] = (uint64_t)tmp5;
+        carry = tmp5 >> 64;
+        
+        tmp5 = (__uint128_t) T[33] + carry;
+        T[32] = (uint64_t) tmp5;
+        T[33] = 0;
     }
 
-    if (A[32] > 0 || cmp_2048bits(A, m)) {
-        trivial_multiple_precision_subtraction(A, m, A);
+    if (T[32] || cmp_2048bits(T, m)) {
+        trivial_multiple_precision_subtraction(T, m, ans);
     }
-
-    memcpy(ans, A, 256);
+    else {
+        memcpy(ans, T, 256);
+    }
 }
 
 inline void rlli_33words_byonebit(uint64_t* a) {
@@ -417,6 +452,17 @@ inline void rlli_33words_byonebit(uint64_t* a) {
     }
 
     if (a[31] & (1ULL << 63)) a[32] |= 1ULL;
+    return;
+}
+
+inline void rlli_33words_byonebit_v2(uint64_t* a) {
+    uint64_t remain = 0;
+    for (int i = 32; i >= 0; i--) {
+        uint64_t tmp = (a[i] >> 1) | remain;
+        remain = a[i] << 63;
+        a[i] = tmp;
+    }
+
     return;
 }
 
@@ -510,14 +556,80 @@ inline void binary_extended_gcd(uint64_t* a, uint64_t* b, uint64_t* x, uint64_t*
     return;
 }
 
+inline void binary_extended_gcd_v2(uint64_t* a, uint64_t* b, uint64_t* x, uint64_t* y) {
+    uint64_t c[33] = {0};
+    uint64_t d[33] = {0};
+    uint64_t u[33], v[33];
+    memcpy(u, x, 264);
+    memcpy(v, y, 264);
+
+    d[0] = 1ULL;
+
+    while (1) {
+        bool isequal = true;
+        for (int i = 32; i >= 0; i--) {
+            if (u[i] != v[i]) {
+                isequal = false;
+                break;
+            }
+        }
+        if (isequal) return;
+
+        while (u[0] % 2 == 0) {
+            rlli_32words(u, 1);
+
+            if (a[0] % 2 == 0) {
+                rlli_33words_byonebit_v2(a);
+            }
+            else {
+                trivial_multiple_precision_addition_v2(a, y, a);
+                rlli_33words_byonebit_v2(a);
+            }
+        }
+        while (v[0] % 2 == 0) {
+            rlli_32words(v, 1);
+
+            if (b[0] % 2 == 0) {
+                rlli_33words_byonebit_v2(b);
+            }
+            else {
+                trivial_multiple_precision_addition_v2(b, y, b);
+                rlli_33words_byonebit_v2(b);
+            }
+        }
+
+        bool nmsl = true;
+        for (int i = 32; i >= 0; i--) {
+            if (u[i] != v[i]) {
+                nmsl = false;
+                break;
+            }
+        }
+        if (nmsl) return;
+
+        if (cmp_2048bits(u, v)) {
+            trivial_multiple_precision_subtraction(u, v, u);
+            if (!cmp_2048bits(a, b)) trivial_multiple_precision_addition_v2(a, y, a);
+            trivial_multiple_precision_subtraction_v2(a, b, a);
+        }
+        else {
+            trivial_multiple_precision_subtraction(v, u, v);
+            if (!cmp_2048bits(b, a)) trivial_multiple_precision_addition_v2(b, y, b);
+            trivial_multiple_precision_subtraction_v2(b, a, b);
+        }
+    }
+
+    return;
+}
+
 __attribute__((target("sse2,ssse3,sha")))
 int main() {
     #ifdef _WIN32
-    setmode(fileno(stdin), O_BINARY);
-    setmode(fileno(stdout), O_BINARY);
+    // setmode(fileno(stdin), O_BINARY);
+    // setmode(fileno(stdout), O_BINARY);
     #endif
     #ifndef ONLINE_JUDGE
-    std::string case_index = std::to_string(6);
+    std::string case_index = std::to_string(7);
     std::string filename = "bigint-checkpoint/check" + case_index + ".in.txt";
     freopen(filename.c_str(), "r", stdin);
     auto ts = std::chrono::high_resolution_clock::now();
@@ -537,16 +649,16 @@ int main() {
     cvrt_str_to_array(p, p_binary);
 
     /* constant */
-    uint64_t R2[32] = {0};
+    uint64_t R2[33] = {0};
     R2[0] = 1ULL;
-    montgomery_init_module(R2, p_binary);
-    uint64_t R[32] = {0};
+    uint64_t p_extend[33] = {0};
+    memcpy(p_extend, p_binary, 256);
+    montgomery_init_module(R2, p_extend);
+    uint64_t R[33] = {0};
     R[0] = 1ULL;
-    montgomery_init_module_v2(R, p_binary);
-    uint64_t psub2[32] = {0};
-    memcpy(psub2, p_binary, 256);
-    trivial_multiple_precision_subtraction(psub2, two, psub2);
+    montgomery_init_module_v2(R, p_extend);
     uint64_t ans_addition[32] = {0}, ans_subtraction[32] = {0};
+    uint64_t neg_p_inverse = compute_neg_m_inverse(p_binary);
 
     std::vector<std::vector<std::string>> ans_input(tt, std::vector<std::string>(5));
 
@@ -555,94 +667,92 @@ int main() {
         uint64_t a_binary[32] = {0}, b_binary[32] = {0};
         cvrt_str_to_array(a, a_binary);
         cvrt_str_to_array(b, b_binary);
-        std::string a_inv, b_inv;
 
         /* addition */
-        // bool overflow = trivial_multiple_precision_addition(a_binary, b_binary, ans_addition);;
+        bool overflow = trivial_multiple_precision_addition(a_binary, b_binary, ans_addition);;
 
-        // if (cmp_2048bits(ans_addition, p_binary) || overflow) {
-        //     trivial_multiple_precision_subtraction(ans_addition, p_binary, ans_addition);
-        // }
+        if (cmp_2048bits(ans_addition, p_binary) || overflow) {
+            trivial_multiple_precision_subtraction(ans_addition, p_binary, ans_addition);
+        }
 
-        // std::string ans_addition_string;
-        // cvrt_array_to_string(ans_addition_string, ans_addition);
-        // ans_input[i][0] = ans_addition_string;
+        std::string ans_addition_string;
+        cvrt_array_to_string(ans_addition_string, ans_addition);
+        ans_input[i][0] = ans_addition_string;
 
         /* subtraction */
-        // if (cmp_2048bits(a_binary, b_binary)) {
-        //     trivial_multiple_precision_subtraction(a_binary, b_binary, ans_subtraction);
-        // }
-        // else {
-        //     trivial_multiple_precision_subtraction(p_binary, b_binary, ans_subtraction);
-        //     trivial_multiple_precision_addition(ans_subtraction, a_binary, ans_subtraction);
-        // }
+        if (cmp_2048bits(a_binary, b_binary)) {
+            trivial_multiple_precision_subtraction(a_binary, b_binary, ans_subtraction);
+        }
+        else {
+            trivial_multiple_precision_subtraction(p_binary, b_binary, ans_subtraction);
+            trivial_multiple_precision_addition(ans_subtraction, a_binary, ans_subtraction);
+        }
 
-        // std::string ans_subtraction_string;
-        // cvrt_array_to_string(ans_subtraction_string, ans_subtraction);
-        // ans_input[i][1] = ans_subtraction_string;
+        std::string ans_subtraction_string;
+        cvrt_array_to_string(ans_subtraction_string, ans_subtraction);
+        ans_input[i][1] = ans_subtraction_string;
 
         /* multiplication */
         uint64_t ans_multiplication[32] = {0};
         uint64_t aR[32] = {0};
         uint64_t bR[32] = {0};
-        uint64_t p_binary_33words[33] = {0};
-        memcpy(p_binary_33words, p_binary, 256);
         uint64_t abR[32] = {0};
         uint64_t one[32] = {0};
         one[0] = 1ULL;
-        montgomery_multiplication(p_binary, a_binary, R2, aR);
-        montgomery_multiplication(p_binary, b_binary, R2, bR);
-        montgomery_multiplication(p_binary, aR, bR, abR);
-        montgomery_multiplication(p_binary, abR, one, ans_multiplication);
+
+        montgomery_multiplication_v2(p_binary, a_binary, R2, aR, neg_p_inverse);
+        montgomery_multiplication_v2(p_binary, b_binary, R2, bR, neg_p_inverse);
+        montgomery_multiplication_v2(p_binary, aR, bR, abR, neg_p_inverse);
+        montgomery_multiplication_v2(p_binary, abR, one, ans_multiplication, neg_p_inverse);
 
         std::string ans_multiplication_string;
         cvrt_array_to_string(ans_multiplication_string, ans_multiplication);
         ans_input[i][2] = ans_multiplication_string;
 
         /* inverse */
-        // uint64_t x[33] = {0};
-        // memcpy(x, a_binary, 256);
-        // uint64_t y[33] = {0};
-        // memcpy(y, p_binary, 256);
-        // uint64_t a_[33] = {0};
-        // a_[0] = 1ULL;
-        // uint64_t b_[33] = {0};
-        // binary_extended_gcd(a_, b_, x, y);
+        uint64_t x[33] = {0};
+        memcpy(x, a_binary, 256);
+        uint64_t y[33] = {0};
+        memcpy(y, p_binary, 256);
+        uint64_t a_[33] = {0};
+        a_[0] = 1ULL;
+        uint64_t b_[33] = {0};
+        binary_extended_gcd_v2(a_, b_, x, y);
 
         // if (a_[32] & 1ULL) {
         //     uint64_t check[32] = {0};
-        //     trivial_multiple_precision_subtraction(check, a_, check);
-        //     montgomery_multiplication(p_binary, check, R, check);
-        //     trivial_multiple_precision_subtraction(p_binary, check, check);
+        //     trivial_multiple_precision_subtraction(check, a_, check);trivial_multiple_precision_subtraction(p_binary, check, check);
+        //     montgomery_multiplication_v2(p_binary, check, R, check, neg_p_inverse);
+            
 
         //     std::string ans_inverse_string;
         //     cvrt_array_to_string(ans_inverse_string, check);
         //     ans_input[i][3] = ans_inverse_string;
         // }
         // else {
-        //     montgomery_multiplication(p_binary, a_, R, a_);
-        //     std::string ans_inverse_string;
-        //     cvrt_array_to_string(ans_inverse_string, a_);
-        //     ans_input[i][3] = ans_inverse_string;
+            montgomery_multiplication_v2(p_binary, a_, R, a_, neg_p_inverse);
+            std::string ans_inverse_string;
+            cvrt_array_to_string(ans_inverse_string, a_);
+            ans_input[i][3] = ans_inverse_string;
         // }
 
         /* exponentiation */
-        // uint64_t ans_pow[32] = {0};
-        // ans_pow[0] = 1ULL;
-        // montgomery_init_module_v2(ans_pow, p_binary);
-        // uint64_t iteration_new[32] = {0};
-        // memcpy(iteration_new, aR, 256);
+        uint64_t ans_pow[32] = {0};
+        ans_pow[0] = 1ULL;
+        memcpy(ans_pow, R, 256);
+        uint64_t iteration_new[32] = {0};
+        memcpy(iteration_new, aR, 256);
 
-        // for (int i = 0; i < 2048; i++, montgomery_multiplication(p_binary, iteration_new, iteration_new, iteration_new)) {
-        //     if ((b_binary[i >> 6] >> (i % 64)) & 1ULL) {
-        //         montgomery_multiplication(p_binary, ans_pow, iteration_new, ans_pow);
-        //     }
-        // }
+        for (int i = 0; i < 2048; i++, montgomery_multiplication_v2(p_binary, iteration_new, iteration_new, iteration_new, neg_p_inverse)) {
+            if ((b_binary[i >> 6] >> (i % 64)) & 1ULL) {
+                montgomery_multiplication_v2(p_binary, ans_pow, iteration_new, ans_pow, neg_p_inverse);
+            }
+        }
 
-        // montgomery_multiplication(p_binary, ans_pow, one, ans_pow);
-        // std::string ans_pow_string;
-        // cvrt_array_to_string(ans_pow_string, ans_pow);
-        // ans_input[i][4] = ans_pow_string;
+        montgomery_multiplication_v2(p_binary, ans_pow, one, ans_pow, neg_p_inverse);
+        std::string ans_pow_string;
+        cvrt_array_to_string(ans_pow_string, ans_pow);
+        ans_input[i][4] = ans_pow_string;
     }
 
     #ifndef ONLINE_JUDGE
@@ -654,19 +764,19 @@ int main() {
     for (int i = 0; i < tt; i++) {
         std::cin >> aa >> bb >> cc >> dd >> ee;
         if (aa != ans_input[i][0]) {
-            std::cerr << "case " << i << " addition incorrect, expected " << '\n' << aa << " found " << ans_input[i][0] << '\n';
+            std::cerr << "case " << i << " addition incorrect, expected " << '\n' << aa << " found " << '\n' << ans_input[i][0] << '\n';
         }
         if (bb != ans_input[i][1]) {
-            std::cerr << "case " << i << " subtraction incorrect, expected " << '\n' << bb << " found " << ans_input[i][1] << '\n';
+            std::cerr << "case " << i << " subtraction incorrect, expected " << '\n' << bb << " found " << '\n' << ans_input[i][1] << '\n';
         }
         if (cc != ans_input[i][2]) {
-            std::cerr << "case " << i << " multiplication incorrect, expected " << '\n' << cc << " found " << ans_input[i][2] << '\n';
+            std::cerr << "case " << i << " multiplication incorrect, expected " << '\n' << cc << " found " << '\n' << ans_input[i][2] << '\n';
         }
         if (dd != ans_input[i][3]) {
             std::cerr << "case " << i << " inverse incorrect, expected " << '\n' << dd << " found " << '\n' << ans_input[i][3] << '\n';
         }
         if (ee != ans_input[i][4]) {
-            std::cerr << "case " << i << " pow incorrect, expected " << '\n' << ee << " found " << ans_input[i][4] << '\n';
+            std::cerr << "case " << i << " pow incorrect, expected " << '\n' << ee << " found " << '\n' << ans_input[i][4] << '\n';
         }
 
     }
