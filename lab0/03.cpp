@@ -5,8 +5,6 @@
 
 #include <immintrin.h>
 
-/* all operands are 2048 or 2049 bits */
-
 uint64_t compute_neg_m_inverse(uint64_t* m) {
     uint64_t cur = m[0];
     uint64_t ans = 1;
@@ -262,21 +260,47 @@ inline bool trivial_multiple_precision_addition_v3(uint64_t* a, uint64_t* b, uin
     // return true;
 }
 
-inline void rlli(uint64_t* a) {
-    bool lo_save = false;
-    bool tmp = 0;
-    constexpr uint64_t save = 1ULL << 63;
-    for (int i = 32; i >= 0; i--) {
-        if (a[i] & 1) {
-            tmp = true;
+inline void trivial_multiple_precision_addition_v4(uint64_t* a, uint64_t* b, uint64_t* ans) {
+    uint64_t c = 0;
+
+    for (int i = 0; i < 33; i++) {
+        uint64_t tmp = a[i] + b[i] + c;
+
+        if (a[i] == 0 && b[i] == 0 && c == 0) continue;
+
+        if ((c == 1 && (tmp <= a[i] || tmp <= b[i])) || (c == 0 && tmp < a[i] && tmp < b[i])) {
+            c = 1;
         }
         else {
-            tmp = false;
+            c = 0;
         }
-        a[i] = (a[i] >> 1) | (lo_save ? save : 0ULL);
 
-        lo_save = tmp;
+        ans[i] = tmp;
     }
+
+    ans[33] += c;
+
+    return;
+}
+
+inline void multi_mult_single(const uint64_t* a, const uint64_t b, uint64_t* ans) {
+    uint64_t hi_save = 0;
+
+    for (int i = 0; i < 32; i++) {
+        __uint128_t tmp = (__uint128_t) a[i] * (__uint128_t) b + (__uint128_t) hi_save;
+        ans[i] = (uint64_t) tmp;
+        hi_save = tmp >> 64;
+    }
+
+    ans[32] = hi_save;
+}
+
+inline void rlli(uint64_t* a) {
+    for (int i = 0; i < 33; i++) {
+        a[i] = a[i + 1];
+    }
+    
+    a[33] = 0;
 }
 
 inline void mult_by_2(uint64_t* a) {
@@ -364,84 +388,71 @@ inline void montgomery_init_module_v2(uint64_t* a, uint64_t* m) {
     }
 }
 
-// inline void montgomery_multiplication(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans) {
-//     /* OUTPUT: (x * y * (R^-1)) mod m */
-//     uint64_t A[33] = {0};
-//     uint64_t t = A[32];
-//     int y_0 = y[0] & 1;
-//     uint64_t y_extend[33] = {0};
-//     memcpy(y_extend, y, 256);
-//     uint64_t m_extend[33] = {0};
-//     memcpy(m_extend, m, 256);
-//     uint64_t yplusm[33] = {0};
-//     trivial_multiple_precision_addition_v2(y_extend, m_extend, yplusm);
-
-//     for (int i = 0; i < 2048; i++) {
-//         int x_i = (x[i >> 6] >> (i % 64)) & 1;
-//         int a_0 = A[0] & 1;
-//         int u_i = (a_0 + x_i * y_0) % 2;
-
-//         if (x_i && u_i) {
-//             trivial_multiple_precision_addition_v3(A, yplusm, A);
-//         }
-//         else if (x_i) {
-//             trivial_multiple_precision_addition_v2(A, y_extend, A);
-//         }
-//         else if (u_i) {
-//             trivial_multiple_precision_addition_v2(A, m_extend, A);
-//         }
-//         rlli(A);
-//     }
-
-//     if (A[32] > 0 || cmp_2048bits(A, m)) {
-//         trivial_multiple_precision_subtraction(A, m, A);
-//     }
-
-//     memcpy(ans, A, 256);
-// }
-
 inline void montgomery_multiplication_v2(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans, uint64_t neg_m_inverse) {
-    uint64_t T[34] = {0}; 
+    /* OUTPUT: (x * y * (R^-1)) mod m */
+    uint64_t A[34] = {0};
 
     for (int i = 0; i < 32; i++) {
-        __uint128_t carry = 0;
+        uint64_t u_i = (uint64_t) (((__uint128_t) A[0] + (__uint128_t) x[i] * (__uint128_t) y[0]) * (__uint128_t) neg_m_inverse);
+        uint64_t xi_y[33] = {0};
+        multi_mult_single(y, x[i], xi_y);
+        uint64_t ui_m[33] = {0};
+        multi_mult_single(m, u_i, ui_m);
 
-        for (int j = 0; j < 32; j++) {
-            __uint128_t tmp = (__uint128_t) x[i] * (__uint128_t) y[j] + (__uint128_t) T[j] + carry;
-            T[j] = (uint64_t) tmp;
-            carry = tmp >> 64;
-        }
-        __uint128_t tmp2 = (__uint128_t) T[32] + carry;
-        T[32] = (uint64_t) tmp2;
-        T[33] = tmp2 >> 64;
-
-        uint64_t u = T[0] * neg_m_inverse;
-
-        __uint128_t tmp3 = (__uint128_t) u * (__uint128_t) m[0] + (__uint128_t) T[0];
-        carry = tmp3 >> 64;
-        
-        for (int j = 1; j < 32; j++) {
-            __uint128_t tmp4 = (__uint128_t) u * (__uint128_t) m[j] + (__uint128_t) T[j] + (__uint128_t) carry;
-            T[j - 1] = (uint64_t) tmp4;
-            carry = tmp4 >> 64;
-        }
-
-        __uint128_t tmp5 = (__uint128_t) T[32] + carry;
-        T[31] = (uint64_t)tmp5;
-        carry = tmp5 >> 64;
-        
-        tmp5 = (__uint128_t) T[33] + carry;
-        T[32] = (uint64_t) tmp5;
-        T[33] = 0;
+        trivial_multiple_precision_addition_v4(A, xi_y, A);
+        trivial_multiple_precision_addition_v4(A, ui_m, A);
+        rlli(A);
     }
 
-    if (T[32] || cmp_2048bits(T, m)) {
-        trivial_multiple_precision_subtraction(T, m, ans);
+    if (A[32] > 0 || cmp_2048bits(A, m)) {
+        trivial_multiple_precision_subtraction(A, m, A);
     }
-    else {
-        memcpy(ans, T, 256);
-    }
+
+    memcpy(ans, A, 256);
 }
+
+// inline void montgomery_multiplication_v2(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans, uint64_t neg_m_inverse) {
+//     uint64_t T[34] = {0}; 
+
+//     for (int i = 0; i < 32; i++) {
+//         __uint128_t carry = 0;
+
+//         for (int j = 0; j < 32; j++) {
+//             __uint128_t tmp = (__uint128_t) x[i] * (__uint128_t) y[j] + (__uint128_t) T[j] + carry;
+//             T[j] = (uint64_t) tmp;
+//             carry = tmp >> 64;
+//         }
+//         __uint128_t tmp2 = (__uint128_t) T[32] + carry;
+//         T[32] = (uint64_t) tmp2;
+//         T[33] = tmp2 >> 64;
+
+//         uint64_t u = T[0] * neg_m_inverse;
+
+//         __uint128_t tmp3 = (__uint128_t) u * (__uint128_t) m[0] + (__uint128_t) T[0];
+//         carry = tmp3 >> 64;
+        
+//         for (int j = 1; j < 32; j++) {
+//             __uint128_t tmp4 = (__uint128_t) u * (__uint128_t) m[j] + (__uint128_t) T[j] + (__uint128_t) carry;
+//             T[j - 1] = (uint64_t) tmp4;
+//             carry = tmp4 >> 64;
+//         }
+
+//         __uint128_t tmp5 = (__uint128_t) T[32] + carry;
+//         T[31] = (uint64_t)tmp5;
+//         carry = tmp5 >> 64;
+        
+//         tmp5 = (__uint128_t) T[33] + carry;
+//         T[32] = (uint64_t) tmp5;
+//         T[33] = 0;
+//     }
+
+//     if (T[32] || cmp_2048bits(T, m)) {
+//         trivial_multiple_precision_subtraction(T, m, ans);
+//     }
+//     else {
+//         memcpy(ans, T, 256);
+//     }
+// }
 
 inline void rlli_33words_byonebit(uint64_t* a) {
     uint64_t remain = 0;
@@ -629,7 +640,7 @@ int main() {
     // setmode(fileno(stdout), O_BINARY);
     #endif
     #ifndef ONLINE_JUDGE
-    std::string case_index = std::to_string(7);
+    std::string case_index = std::to_string(1);
     std::string filename = "bigint-checkpoint/check" + case_index + ".in.txt";
     freopen(filename.c_str(), "r", stdin);
     auto ts = std::chrono::high_resolution_clock::now();
@@ -660,7 +671,7 @@ int main() {
     uint64_t ans_addition[32] = {0}, ans_subtraction[32] = {0};
     uint64_t neg_p_inverse = compute_neg_m_inverse(p_binary);
 
-    std::vector<std::vector<std::string>> ans_input(tt, std::vector<std::string>(5));
+    // std::vector<std::vector<std::string>> ans_input(tt, std::vector<std::string>(5));
 
     for (uint64_t i = 0; i < tt; i++) {
         std::cin >> a >> b;
@@ -677,7 +688,7 @@ int main() {
 
         std::string ans_addition_string;
         cvrt_array_to_string(ans_addition_string, ans_addition);
-        ans_input[i][0] = ans_addition_string;
+        std::cout << ans_addition_string << '\n';
 
         /* subtraction */
         if (cmp_2048bits(a_binary, b_binary)) {
@@ -690,7 +701,7 @@ int main() {
 
         std::string ans_subtraction_string;
         cvrt_array_to_string(ans_subtraction_string, ans_subtraction);
-        ans_input[i][1] = ans_subtraction_string;
+        std::cout << ans_subtraction_string << '\n';
 
         /* multiplication */
         uint64_t ans_multiplication[32] = {0};
@@ -707,7 +718,7 @@ int main() {
 
         std::string ans_multiplication_string;
         cvrt_array_to_string(ans_multiplication_string, ans_multiplication);
-        ans_input[i][2] = ans_multiplication_string;
+        std::cout << ans_multiplication_string << '\n';
 
         /* inverse */
         uint64_t x[33] = {0};
@@ -733,7 +744,7 @@ int main() {
             montgomery_multiplication_v2(p_binary, a_, R, a_, neg_p_inverse);
             std::string ans_inverse_string;
             cvrt_array_to_string(ans_inverse_string, a_);
-            ans_input[i][3] = ans_inverse_string;
+            std::cout << ans_inverse_string << '\n';
         // }
 
         /* exponentiation */
@@ -752,41 +763,43 @@ int main() {
         montgomery_multiplication_v2(p_binary, ans_pow, one, ans_pow, neg_p_inverse);
         std::string ans_pow_string;
         cvrt_array_to_string(ans_pow_string, ans_pow);
-        ans_input[i][4] = ans_pow_string;
+        std::cout << ans_pow_string << '\n';
+
+        std::cout << '\n';
     }
 
     #ifndef ONLINE_JUDGE
 
-    std::string newfilename = "bigint-checkpoint/check" + case_index + ".out.txt";
-    freopen(newfilename.c_str(), "r", stdin);
-    std::string aa, bb, cc, dd, ee;
+    // std::string newfilename = "bigint-checkpoint/check" + case_index + ".out.txt";
+    // freopen(newfilename.c_str(), "r", stdin);
+    // std::string aa, bb, cc, dd, ee;
 
-    for (int i = 0; i < tt; i++) {
-        std::cin >> aa >> bb >> cc >> dd >> ee;
-        if (aa != ans_input[i][0]) {
-            std::cerr << "case " << i << " addition incorrect, expected " << '\n' << aa << " found " << '\n' << ans_input[i][0] << '\n';
-        }
-        if (bb != ans_input[i][1]) {
-            std::cerr << "case " << i << " subtraction incorrect, expected " << '\n' << bb << " found " << '\n' << ans_input[i][1] << '\n';
-        }
-        if (cc != ans_input[i][2]) {
-            std::cerr << "case " << i << " multiplication incorrect, expected " << '\n' << cc << " found " << '\n' << ans_input[i][2] << '\n';
-        }
-        if (dd != ans_input[i][3]) {
-            std::cerr << "case " << i << " inverse incorrect, expected " << '\n' << dd << " found " << '\n' << ans_input[i][3] << '\n';
-        }
-        if (ee != ans_input[i][4]) {
-            std::cerr << "case " << i << " pow incorrect, expected " << '\n' << ee << " found " << '\n' << ans_input[i][4] << '\n';
-        }
+    // for (int i = 0; i < tt; i++) {
+    //     std::cin >> aa >> bb >> cc >> dd >> ee;
+    //     if (aa != ans_input[i][0]) {
+    //         std::cerr << "case " << i << " addition incorrect, expected " << '\n' << aa << " found " << '\n' << ans_input[i][0] << '\n';
+    //     }
+    //     if (bb != ans_input[i][1]) {
+    //         std::cerr << "case " << i << " subtraction incorrect, expected " << '\n' << bb << " found " << '\n' << ans_input[i][1] << '\n';
+    //     }
+    //     if (cc != ans_input[i][2]) {
+    //         std::cerr << "case " << i << " multiplication incorrect, expected " << '\n' << cc << " found " << '\n' << ans_input[i][2] << '\n';
+    //     }
+    //     if (dd != ans_input[i][3]) {
+    //         std::cerr << "case " << i << " inverse incorrect, expected " << '\n' << dd << " found " << '\n' << ans_input[i][3] << '\n';
+    //     }
+    //     if (ee != ans_input[i][4]) {
+    //         std::cerr << "case " << i << " pow incorrect, expected " << '\n' << ee << " found " << '\n' << ans_input[i][4] << '\n';
+    //     }
 
-    }
+    // }
 
-    auto te = std::chrono::high_resolution_clock::now();
-    std::cout
-        << "Duration: "
-        << std::chrono::duration_cast<std::chrono::milliseconds>(te - ts).count()
-        << "ms"
-        << std::endl;
+    // auto te = std::chrono::high_resolution_clock::now();
+    // std::cout
+    //     << "Duration: "
+    //     << std::chrono::duration_cast<std::chrono::milliseconds>(te - ts).count()
+    //     << "ms"
+    //     << std::endl;
 
     #endif
 
