@@ -4,6 +4,10 @@ constexpr uint64_t N = 2;
 
 long long cnt = 0;
 
+inline uint64_t rho_partition_mont(const uint64_t* x) {
+    return x[0] & 3ULL;
+}
+
 uint64_t compute_neg_m_inverse(uint64_t* m) {
     uint64_t cur = m[0];
     uint64_t ans = 1;
@@ -387,29 +391,6 @@ inline void montgomery_init_module_v2(uint64_t* a, uint64_t* m) {
     }
 }
 
-// inline void montgomery_multiplication_v2(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans, uint64_t neg_m_inverse) {
-//     /* OUTPUT: (x * y * (R^-1)) mod m */
-//     uint64_t A[34] = {0};
-
-//     for (int i = 0; i < 32; i++) {
-//         uint64_t u_i = (uint64_t) (((__uint128_t) A[0] + (__uint128_t) x[i] * (__uint128_t) y[0]) * (__uint128_t) neg_m_inverse);
-//         uint64_t xi_y[33] = {0};
-//         multi_mult_single(y, x[i], xi_y);
-//         uint64_t ui_m[33] = {0};
-//         multi_mult_single(m, u_i, ui_m);
-
-//         trivial_multiple_precision_addition_v4(A, xi_y, A);
-//         trivial_multiple_precision_addition_v4(A, ui_m, A);
-//         rlli(A);
-//     }
-
-//     if (A[32] > 0 || cmp_2048bits(A, m)) {
-//         trivial_multiple_precision_subtraction(A, m, A);
-//     }
-
-//     memcpy(ans, A, 256);
-// }
-
 inline void montgomery_multiplication_v2(uint64_t* m, const uint64_t* x, const uint64_t* y, uint64_t* ans, uint64_t neg_m_inverse) {
     uint64_t T[N + 2] = {0}; 
 
@@ -502,159 +483,31 @@ inline void rlli_32words(uint64_t* a, uint64_t shift) {
     return;
 }
 
-// inline void binary_extended_gcd(uint64_t* a, uint64_t* b, uint64_t* x, uint64_t* y) {
-//     uint64_t c[N + 1] = {0};
-//     uint64_t d[N + 1] = {0};
-//     uint64_t u[N + 1], v[N + 1];
-//     memcpy(u, x, ((N + 1) << 3));
-//     memcpy(v, y, ((N + 1) << 3));
-
-//     d[0] = 1ULL;
-
-//     while (1) {
-//         bool isequal = true;
-//         for (int i = N; i >= 0; i--) {
-//             if (u[i] != v[i]) {
-//                 isequal = false;
-//                 break;
-//             }
-//         }
-//         if (isequal) return;
-
-//         if (u[0] % 2 == 0) {
-//             rlli_32words(u, 1);
-
-//             if (a[0] % 2 == 0 && b[0] % 2 == 0) {
-//                 rlli_33words_byonebit(a);
-//                 rlli_33words_byonebit(b);
-//             }
-//             else {
-//                 trivial_multiple_precision_addition_v3(a, y, a);
-//                 rlli_33words_byonebit(a);
-
-//                 trivial_multiple_precision_subtraction_v2(b, x, b);
-//                 rlli_33words_byonebit(b);
-//             }
-//         }
-//         else if (v[0] % 2 == 0) {
-//             rlli_32words(v, 1);
-
-//             if (c[0] % 2 == 0 && d[0] % 2 == 0) {
-//                 rlli_33words_byonebit(c);
-//                 rlli_33words_byonebit(d);
-//             }
-//             else {
-//                 trivial_multiple_precision_addition_v3(c, y, c);
-//                 rlli_33words_byonebit(c);
-
-//                 trivial_multiple_precision_subtraction_v2(d, x, d);
-//                 rlli_33words_byonebit(d);
-//             }
-//         }
-//         else if (cmp_2049bits_v2(u, v)) {
-//             trivial_multiple_precision_subtraction_v2(u, v, u);
-//             trivial_multiple_precision_subtraction_v2(a, c, a);
-//             trivial_multiple_precision_subtraction_v2(b, d, b);
-//         }
-//         else {
-//             trivial_multiple_precision_subtraction_v2(v, u, v);
-//             trivial_multiple_precision_subtraction_v2(c, a, c);
-//             trivial_multiple_precision_subtraction_v2(d, b, d);
-//         }
-//     }
-
-//     return;
-// }
-
-inline void binary_extended_gcd_v2(uint64_t* a, uint64_t* b, uint64_t* x, uint64_t* y) {
-    uint64_t c[N + 1] = {0};
-    uint64_t d[N + 1] = {0};
-    uint64_t u[N + 1], v[N + 1];
-    memcpy(u, x, ((N + 1) << 3));
-    memcpy(v, y, ((N + 1) << 3));
-
-    d[0] = 1ULL;
-
-    while (1) {
-        bool isequal = true;
-        for (int i = N; i >= 0; i--) {
-            if (u[i] != v[i]) {
-                isequal = false;
-                break;
-            }
-        }
-        if (isequal) return;
-
-        while (u[0] % 2 == 0) {
-            rlli_32words(u, 1);
-
-            if (a[0] % 2 == 0) {
-                rlli_33words_byonebit_v2(a);
-            }
-            else {
-                trivial_multiple_precision_addition_v2(a, y, a);
-                rlli_33words_byonebit_v2(a);
-            }
-        }
-        while (v[0] % 2 == 0) {
-            rlli_32words(v, 1);
-
-            if (b[0] % 2 == 0) {
-                rlli_33words_byonebit_v2(b);
-            }
-            else {
-                trivial_multiple_precision_addition_v2(b, y, b);
-                rlli_33words_byonebit_v2(b);
-            }
-        }
-
-        bool ok = true;
-        for (int i = N; i >= 0; i--) {
-            if (u[i] != v[i]) {
-                ok = false;
-                break;
-            }
-        }
-        if (ok) return;
-
-        if (cmp_2048bits(u, v)) {
-            trivial_multiple_precision_subtraction(u, v, u);
-            if (!cmp_2048bits(a, b)) trivial_multiple_precision_addition_v2(a, y, a);
-            trivial_multiple_precision_subtraction_v2(a, b, a);
-        }
-        else {
-            trivial_multiple_precision_subtraction(v, u, v);
-            if (!cmp_2048bits(b, a)) trivial_multiple_precision_addition_v2(b, y, b);
-            trivial_multiple_precision_subtraction_v2(b, a, b);
-        }
-    }
-
-    return;
-}
-
 /* new */
 
-// __uint128_t ex_gcd(__uint128_t a, __uint128_t b, __uint128_t& x, __uint128_t& y) {
-//   if (!b) {
-//     x = 1;
-//     y = 0;
-//     return a;
-//   } else {
-//     __uint128_t d = ex_gcd(b, a % b, y, x);
-//     y -= a / b * x;
-//     return d;
-//   }
-// }
-
-// __uint128_t solve_linear_congruence_equation(__uint128_t a, __uint128_t b, __uint128_t n) {
-//   __uint128_t x, y;
-//   __uint128_t d = ex_gcd(a, n, x, y);
-//   if (b % d) return -1;
-//   n /= d;
-//   return (x * (b / d) % n + n) % n;
-// }
+inline void partition(uint64_t* x, uint64_t* a, uint64_t* b, uint64_t* n, uint64_t* p, const uint64_t* alpha_mult_R_mod_p, const uint64_t* beta_mult_R_mod_p, uint64_t* R_mod_n, uint64_t* twoR_mod_n, const uint64_t neg_p_inverse, const uint64_t neg_n_inverse) {
+    if (x[0] % 3 == 2) {
+        montgomery_multiplication_v2(p, x, x, x, neg_p_inverse);
+        montgomery_multiplication_v2(n, a, twoR_mod_n, a, neg_n_inverse);
+        montgomery_multiplication_v2(n, b, twoR_mod_n, b, neg_n_inverse);
+    }
+    else if (x[0] % 3 == 1) {
+        montgomery_multiplication_v2(p, x, beta_mult_R_mod_p, x, neg_p_inverse);
+        trivial_multiple_precision_addition(b, R_mod_n, b);
+        if (cmp_2048bits(b, n)) trivial_multiple_precision_subtraction(b, n, b);
+    }
+    else {
+        montgomery_multiplication_v2(p, x, alpha_mult_R_mod_p, x, neg_p_inverse);
+        trivial_multiple_precision_addition(a, R_mod_n, a);
+        if (cmp_2048bits(a, n)) trivial_multiple_precision_subtraction(a, n, a);
+    }
+}
 
 int main() {
+    #ifndef ONLINE_JUDGE
+    std::ofstream ofs("output.txt");
+    #endif
+
     std::string ps, ns, alphas, betas;
     std::cin >> ps >> ns >> alphas >> betas;
 
@@ -666,38 +519,24 @@ int main() {
     memcpy(p_extend, p, (N << 3));
     memcpy(n_extend, n, (N << 3));
 
-    uint64_t x[N] = {0}, a[N] = {0}, b[N] = {0};
-    memcpy(x, beta, (N << 3));
-    b[0] = 1ULL;
-    uint64_t x_[N] = {0}, a_[N] = {0}, b_[N] = {0};
-
+    /* constants */
     uint64_t R_mod_p[N + 1] = {0}; R_mod_p[0] = 1ULL;
     uint64_t R_mod_n[N + 1] = {0}; R_mod_n[0] = 1ULL;
     uint64_t R2_mod_p[N + 1] = {0}; R2_mod_p[0] = 1ULL;
     uint64_t R2_mod_n[N + 1] = {0}; R2_mod_n[0] = 1ULL;
-
-    uint64_t one[N] = {0}; one[0] = 1ULL;
-    uint64_t two[N] = {0}; two[0] = 2ULL;
-
     montgomery_init_module_v2(R_mod_p, p_extend);
     montgomery_init_module_v2(R_mod_n, n_extend);
     montgomery_init_module(R2_mod_p, p_extend);
     montgomery_init_module(R2_mod_n, n_extend);
-
+    uint64_t one[N] = {0}; one[0] = 1ULL;
+    uint64_t two[N] = {0}; two[0] = 2ULL;
     uint64_t twoR_mod_n[N]; memcpy(twoR_mod_n, R_mod_n, (N << 3));
     mult_by_2(twoR_mod_n);
-
     if (cmp_2048bits(twoR_mod_n, n)) {
         trivial_multiple_precision_subtraction(twoR_mod_n, n, twoR_mod_n);
     }
-
     uint64_t neg_p_inverse = compute_neg_m_inverse(p);
     uint64_t neg_n_inverse = compute_neg_m_inverse(n);
-
-    montgomery_multiplication_v2(p, x, R2_mod_p, x, neg_p_inverse);
-    montgomery_multiplication_v2(n, b, R2_mod_n, b, neg_n_inverse);
-    memcpy(x_, x, (N << 3)), memcpy(a_, a, (N << 3)), memcpy(b_, b, (N << 3));
-
     uint64_t alpha_mult_R_mod_p[N] = {0};
     memcpy(alpha_mult_R_mod_p, alpha, (N << 3));
     montgomery_multiplication_v2(p, alpha_mult_R_mod_p, R2_mod_p, alpha_mult_R_mod_p, neg_p_inverse);
@@ -705,32 +544,18 @@ int main() {
     memcpy(beta_mult_R_mod_p, beta, (N << 3));
     montgomery_multiplication_v2(p, beta_mult_R_mod_p, R2_mod_p, beta_mult_R_mod_p, neg_p_inverse);
 
-    uint64_t tmpx[N] = {0}, tmpx_[N] = {0};
-    memcpy(tmpx, beta, (N << 3));
-    memcpy(tmpx_, beta, (N << 3));
+    /* variables */
+    uint64_t x[N] = {0}, a[N] = {0}, b[N] = {0};
+    memcpy(x, R_mod_p, (N << 3));
+    uint64_t x_[N] = {0}, a_[N] = {0}, b_[N] = {0};
 
-    if (tmpx_[0] % 3 == 0) {
-        montgomery_multiplication_v2(p, x_, x_, x_, neg_p_inverse);
-        montgomery_multiplication_v2(n, a_, twoR_mod_n, a_, neg_n_inverse);
-        montgomery_multiplication_v2(n, b_, twoR_mod_n, b_, neg_n_inverse);
-        montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-    }
-    else if (tmpx_[0] % 3 == 1) {
-        montgomery_multiplication_v2(p, x_, beta_mult_R_mod_p, x_, neg_p_inverse);
-        trivial_multiple_precision_addition(b_, R_mod_n, b_);
-        if (cmp_2048bits(b_, n)) trivial_multiple_precision_subtraction(b_, n, b_);
+    // partition(x, a, b, n, p, alpha_mult_R_mod_p, beta_mult_R_mod_p, R_mod_n, twoR_mod_n, neg_p_inverse, neg_n_inverse);
+    montgomery_multiplication_v2(p, x, beta_mult_R_mod_p, x, neg_p_inverse);
+    trivial_multiple_precision_addition(b, R_mod_n, b);
+    if (cmp_2048bits(b, n)) trivial_multiple_precision_subtraction(b, n, b);
 
-        montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-    }
-    else {
-        montgomery_multiplication_v2(p, x_, alpha_mult_R_mod_p, x_, neg_p_inverse);
-        trivial_multiple_precision_addition(a_, R_mod_n, a_);
-        if (cmp_2048bits(a_, n)) trivial_multiple_precision_subtraction(a_, n, a_);
-
-        montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-    }
-
-    
+    memcpy(x_, x, (N << 3)), memcpy(a_, a, (N << 3)), memcpy(b_, b, (N << 3));
+    partition(x_, a_, b_, n, p, alpha_mult_R_mod_p, beta_mult_R_mod_p, R_mod_n, twoR_mod_n, neg_p_inverse, neg_n_inverse);
 
     while (1) {
         // if (cnt % 10000 == 0) {
@@ -747,68 +572,11 @@ int main() {
         }
         if (isequal) break;
 
-        if (tmpx[0] % 3 == 0) {
-            montgomery_multiplication_v2(p, x, x, x, neg_p_inverse);
-            montgomery_multiplication_v2(n, a, twoR_mod_n, a, neg_n_inverse);
-            montgomery_multiplication_v2(n, b, twoR_mod_n, b, neg_n_inverse);
-            montgomery_multiplication_v2(p, x, one, tmpx, neg_p_inverse);
-        }
-        else if (tmpx[0] % 3 == 1) {
-            montgomery_multiplication_v2(p, x, beta_mult_R_mod_p, x, neg_p_inverse);
-            trivial_multiple_precision_addition(b, R_mod_n, b);
-            if (cmp_2048bits(b, n)) trivial_multiple_precision_subtraction(b, n, b);
+        partition(x, a, b, n, p, alpha_mult_R_mod_p, beta_mult_R_mod_p, R_mod_n, twoR_mod_n, neg_p_inverse, neg_n_inverse);
 
-            montgomery_multiplication_v2(p, x, one, tmpx, neg_p_inverse);
-        }
-        else {
-            montgomery_multiplication_v2(p, x, alpha_mult_R_mod_p, x, neg_p_inverse);
-            trivial_multiple_precision_addition(a, R_mod_n, a);
-            if (cmp_2048bits(a, n)) trivial_multiple_precision_subtraction(a, n, a);
+        partition(x_, a_, b_, n, p, alpha_mult_R_mod_p, beta_mult_R_mod_p, R_mod_n, twoR_mod_n, neg_p_inverse, neg_n_inverse);
 
-            montgomery_multiplication_v2(p, x, one, tmpx, neg_p_inverse);
-        }
-
-        if (tmpx_[0] % 3 == 0) {
-            montgomery_multiplication_v2(p, x_, x_, x_, neg_p_inverse);
-            montgomery_multiplication_v2(n, a_, twoR_mod_n, a_, neg_n_inverse);
-            montgomery_multiplication_v2(n, b_, twoR_mod_n, b_, neg_n_inverse);
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
-        else if (tmpx_[0] % 3 == 1) {
-            montgomery_multiplication_v2(p, x_, beta_mult_R_mod_p, x_, neg_p_inverse);
-            trivial_multiple_precision_addition(b_, R_mod_n, b_);
-            if (cmp_2048bits(b_, n)) trivial_multiple_precision_subtraction(b_, n, b_);
-
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
-        else {
-            montgomery_multiplication_v2(p, x_, alpha_mult_R_mod_p, x_, neg_p_inverse);
-            trivial_multiple_precision_addition(a_, R_mod_n, a_);
-            if (cmp_2048bits(a_, n)) trivial_multiple_precision_subtraction(a_, n, a_);
-
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
-
-        if (tmpx_[0] % 3 == 0) {
-            montgomery_multiplication_v2(p, x_, x_, x_, neg_p_inverse);
-            montgomery_multiplication_v2(n, a_, twoR_mod_n, a_, neg_n_inverse);
-            montgomery_multiplication_v2(n, b_, twoR_mod_n, b_, neg_n_inverse);
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
-        else if (tmpx_[0] % 3 == 1) {
-            montgomery_multiplication_v2(p, x_, beta_mult_R_mod_p, x_, neg_p_inverse);
-            trivial_multiple_precision_addition(b_, R_mod_n, b_);
-            if (cmp_2048bits(b_, n)) trivial_multiple_precision_subtraction(b_, n, b_);
-
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
-        else {
-            montgomery_multiplication_v2(p, x_, alpha_mult_R_mod_p, x_, neg_p_inverse);
-            trivial_multiple_precision_addition(a_, R_mod_n, a_);
-            if (cmp_2048bits(a_, n)) trivial_multiple_precision_subtraction(a_, n, a_);
-
-            montgomery_multiplication_v2(p, x_, one, tmpx_, neg_p_inverse);
-        }
+        partition(x_, a_, b_, n, p, alpha_mult_R_mod_p, beta_mult_R_mod_p, R_mod_n, twoR_mod_n, neg_p_inverse, neg_n_inverse);
     }
 
     montgomery_multiplication_v2(n, a, one, a, neg_n_inverse);
@@ -857,6 +625,19 @@ int main() {
     //     std::cout << ans << '\n';
     //     return 0;
     // }
+
+    #ifndef ONLINE_JUDGE
+    std::string str_a, str_b, str_a_, str_b_;
+    cvrt_array_to_string(str_a, a);
+    cvrt_array_to_string(str_b, b);
+    cvrt_array_to_string(str_a_, a_);
+    cvrt_array_to_string(str_b_, b_);
+
+    ofs << "a = " << str_a << std::endl;
+    ofs << "b = " << str_b << std::endl;
+    ofs << "a' = " << str_a_ << std::endl;
+    ofs << "b' = " << str_b_ << std::endl;
+    #endif
     
     uint64_t A_mult_R_mod_n[N] = {0};
     montgomery_multiplication_v2(n, A, R2_mod_n, A_mult_R_mod_n, neg_n_inverse);
@@ -883,6 +664,10 @@ int main() {
 
     std::string ans_string;
     cvrt_array_to_string(ans_string, ans);
+    #ifndef ONLINE_JUDGE
+    ofs << "answer is " << ans_string << std::endl;
+    #else
     std::cout << ans_string << '\n';
+    #endif
     return 0;
 }
